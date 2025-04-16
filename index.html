@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NeuBrutalist News</title>
+    <script src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Space Grotesk', sans-serif;
+            background-color: #f0f0f0;
+        }
+        .neu-brutal {
+            border: 4px solid black;
+            box-shadow: 6px 6px 0 black;
+            transition: all 0.2s ease;
+        }
+        .neu-brutal:hover {
+            transform: translate(-2px, -2px);
+            box-shadow: 8px 8px 0 black;
+        }
+        .loading-spin {
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+        .pagination-button {
+            transition: all 0.2s ease;
+        }
+        .pagination-button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+    </style>
+</head>
+<body>
+    <div x-data="newsApp" class="min-h-screen p-4 md:p-8">
+        <header class="mb-8">
+            <h1 class="text-4xl md:text-6xl font-bold mb-4 neu-brutal bg-yellow-300 inline-block p-4">
+                BRUTAL NEWS
+            </h1>
+        </header>
+
+        <!-- Search and Filter Section -->
+        <div class="mb-8 neu-brutal bg-white p-4">
+            <div class="flex flex-wrap gap-4">
+                <input 
+                    type="text" 
+                    x-model="searchQuery" 
+                    placeholder="Search news..."
+                    class="p-2 neu-brutal bg-blue-100 flex-grow"
+                    @keyup.enter="fetchNews"
+                >
+                <select 
+                    x-model="selectedCategory" 
+                    class="p-2 neu-brutal bg-green-100"
+                    @change="fetchNews"
+                >
+                    <option value="">All Categories</option>
+                    <option value="general">General</option>
+                    <option value="business">Business</option>
+                    <option value="technology">Technology</option>
+                    <option value="sports">Sports</option>
+                    <option value="entertainment">Entertainment</option>
+                    <option value="health">Health</option>
+                    <option value="science">Science</option>
+                </select>
+                <select 
+                    x-model="selectedCountry" 
+                    class="p-2 neu-brutal bg-orange-100"
+                    @change="fetchNews"
+                >
+                    <option value="">All Countries</option>
+                    <option value="us">United States</option>
+                    <option value="gb">United Kingdom</option>
+                    <option value="ca">Canada</option>
+                    <option value="au">Australia</option>
+                    <option value="de">Germany</option>
+                    <option value="fr">France</option>
+                    <option value="in">India</option>
+                    <option value="jp">Japan</option>
+                </select>
+                <button 
+                    @click="fetchNews" 
+                    class="neu-brutal bg-red-300 p-2 px-4 flex items-center gap-1"
+                >
+                    <i class="bi bi-search"></i> Search
+                </button>
+            </div>
+        </div>
+
+        <!-- Loading State -->
+        <div x-show="loading" class="flex justify-center items-center my-8">
+            <div class="neu-brutal bg-white p-6 flex flex-col items-center">
+                <i class="bi bi-arrow-repeat text-4xl loading-spin"></i>
+                <p class="mt-3 font-bold">Loading news...</p>
+            </div>
+        </div>
+
+        <!-- Error Message -->
+        <div x-show="error" class="neu-brutal bg-red-100 p-4 mb-8">
+            <p x-text="error" class="text-red-600 font-bold"></p>
+            <button @click="fetchNews" class="mt-2 neu-brutal bg-white px-3 py-1">Try Again</button>
+        </div>
+
+        <!-- News Grid -->
+        <div x-show="!loading && !error && news.length > 0" class="mb-8">
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <template x-for="(article, index) in news" :key="index">
+                    <article class="neu-brutal bg-white p-4 flex flex-col h-full">
+                        <div class="mb-4 flex flex-wrap gap-2">
+                            <span class="bg-purple-200 neu-brutal px-2 py-1 text-sm" x-text="article.category || 'General'"></span>
+                            <span class="bg-blue-200 neu-brutal px-2 py-1 text-sm" x-text="article.source || 'Unknown Source'"></span>
+                        </div>
+                        <h2 class="text-xl font-bold mb-2" x-text="article.title"></h2>
+                        <p class="text-gray-600 mb-4 flex-grow" x-text="article.description || 'No description available'"></p>
+                        <div class="flex justify-between items-center mt-auto">
+                            <span class="text-sm text-gray-500" x-text="formatDate(article.published_at)"></span>
+                            <a :href="article.url" target="_blank" class="neu-brutal bg-pink-200 px-3 py-1 flex items-center gap-1">
+                                <span>Read More</span>
+                                <i class="bi bi-box-arrow-up-right"></i>
+                            </a>
+                        </div>
+                    </article>
+                </template>
+            </div>
+        </div>
+
+        <!-- No Results Message -->
+        <div x-show="!loading && !error && news.length === 0" class="neu-brutal bg-yellow-100 p-8 text-center mb-8">
+            <i class="bi bi-exclamation-triangle text-4xl"></i>
+            <p class="font-bold text-xl mt-2">No news articles found</p>
+            <p class="mt-1">Try different search terms or filters</p>
+        </div>
+
+        <!-- Pagination Controls -->
+        <div x-show="!loading && !error && news.length > 0" class="flex justify-center items-center gap-4 mt-8">
+            <button 
+                @click="previousPage" 
+                :disabled="currentPage <= 1" 
+                class="neu-brutal bg-green-200 p-2 px-4 pagination-button flex items-center gap-1"
+            >
+                <i class="bi bi-arrow-left"></i> Previous
+            </button>
+            
+            <span class="neu-brutal bg-white p-2 px-4">Page <span x-text="currentPage"></span></span>
+            
+            <button 
+                @click="nextPage" 
+                class="neu-brutal bg-green-200 p-2 px-4 pagination-button flex items-center gap-1"
+            >
+                Next <i class="bi bi-arrow-right"></i>
+            </button>
+        </div>
+
+        <!-- Footer -->
+        <footer class="mt-12 text-center p-4">
+            <p>Powered by MediaStack API | NeuBrutalism Design</p>
+            <p class="text-sm mt-2">© <span x-text="new Date().getFullYear()"></span> BRUTAL NEWS</p>
+        </footer>
+    </div>
+
+    <script>
+        document.addEventListener('alpine:init', () => {
+            Alpine.data('newsApp', () => ({
+                news: [],
+                loading: false,
+                error: null,
+                searchQuery: '',
+                selectedCategory: '',
+                selectedCountry: '',
+                currentPage: 1,
+                limit: 9,
+                totalResults: 0,
+
+                async fetchNews() {
+                    this.loading = true;
+                    this.error = null;
+                    
+                    try {
+                        let url = 'https://api.mediastack.com/v1/news?access_key=e5a33deb28a80c19b33b1d911f4bf0cb';
+                        
+                        // Add parameters
+                        url += `&limit=${this.limit}&offset=${(this.currentPage - 1) * this.limit}`;
+                        
+                        if (this.searchQuery) {
+                            url += `&keywords=${encodeURIComponent(this.searchQuery)}`;
+                        }
+                        
+                        if (this.selectedCategory) {
+                            url += `&categories=${this.selectedCategory}`;
+                        }
+
+                        if (this.selectedCountry) {
+                            url += `&countries=${this.selectedCountry}`;
+                        }
+
+                        // Sort by newest first (default in MediaStack)
+                        url += `&sort=published_desc`;
+
+                        const response = await fetch(url);
+                        
+                        if (!response.ok) {
+                            throw new Error(`Failed to fetch news: ${response.status} ${response.statusText}`);
+                        }
+
+                        const data = await response.json();
+                        
+                        if (data.error) {
+                            throw new Error(data.error.message || 'API Error');
+                        }
+
+                        this.news = data.data || [];
+                        this.totalResults = data.pagination?.total || this.news.length;
+                        
+                    } catch (err) {
+                        console.error('News API Error:', err);
+                        this.error = err.message || 'Failed to load news. Please try again later.';
+                        this.news = [];
+                    } finally {
+                        this.loading = false;
+                    }
+                },
+
+                nextPage() {
+                    this.currentPage++;
+                    this.fetchNews();
+                    this.scrollToTop();
+                },
+
+                previousPage() {
+                    if (this.currentPage > 1) {
+                        this.currentPage--;
+                        this.fetchNews();
+                        this.scrollToTop();
+                    }
+                },
+
+                scrollToTop() {
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                },
+
+                formatDate(dateString) {
+                    if (!dateString) return 'Unknown date';
+                    
+                    try {
+                        const date = new Date(dateString);
+                        return date.toLocaleDateString('en-US', { 
+                            year: 'numeric', 
+                            month: 'short', 
+                            day: 'numeric',
+                            hour: '2-digit',
+                            minute: '2-digit'
+                        });
+                    } catch (e) {
+                        return dateString;
+                    }
+                },
+
+                init() {
+                    this.fetchNews();
+                    
+                    // Handle browser navigation
+                    window.addEventListener('popstate', () => {
+                        const params = new URLSearchParams(window.location.search);
+                        this.currentPage = parseInt(params.get('page')) || 1;
+                        this.searchQuery = params.get('q') || '';
+                        this.selectedCategory = params.get('category') || '';
+                        this.selectedCountry = params.get('country') || '';
+                        this.fetchNews();
+                    });
+                }
+            }));
+        });
+    </script>
+<script>document.body.addEventListener('wheel', e => { if (!e.ctrlKey) return; e.preventDefault(); return }, { passive: false })</script>
+	</body>
+</html>
